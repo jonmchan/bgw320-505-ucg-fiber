@@ -1,11 +1,11 @@
 # BGW320-505 GPON bypass on UniFi Cloud Gateway Fiber
 
-Replace an Arris **BGW320-505** on **AT&T GPON** with a UniFi Cloud Gateway Fiber and a **DFP-34X-2C2** SFP ONT. AT&T still requires 802.1X EAP-TLS. The gateway runs `wpa_supplicant` with certificates extracted from that BGW320-505.
+Replace an Arris **BGW320-505** on **AT&T GPON** with a UniFi Cloud Gateway Fiber and a Luleey **LL-XS2510** XPON SFP stick (the ODI DFP-34X-2C2). AT&T still requires 802.1X EAP-TLS. The gateway runs `wpa_supplicant` with certificates extracted from that BGW320-505.
 
 This is a GPON install (1310 nm, the SFP that lives in the BGW320). It is the path used when the fiber goes into a stick in the gateway, the stick reaches ONU state O5, and `omcicli mib get 171` shows that the OLT still requires EAP.
 
 ```text
-AT&T GPON → DFP-34X-2C2 (UCG Fiber SFP+ port 7, eth6) → EAP-TLS on eth6.0 → DHCP on eth6.<vid>
+AT&T GPON → LL-XS2510, SC APC (UCG Fiber SFP+ port 7, eth6) → EAP-TLS on eth6.0 → DHCP on eth6.<vid>
 ```
 
 Two VLANs are in play, and they are different jobs:
@@ -20,7 +20,7 @@ Doing this can take the circuit offline, and it can conflict with AT&T's terms. 
 ## What you need
 
 - Arris BGW320-505 (Nokia). The Humax model is the BGW320-500. The flash identity and the firmware-downgrade images are different.
-- DFP-34X-2C2 (or the same ODI stick sold under other names, including some ISZO sticks) already able to reach **O5** on your fiber, or the parts to program it: a laptop and either a media converter or a spare SFP port.
+- The SFP stick from [Luleey’s 2.5G XPON SFP ONU listing](https://www.luleey.com/product/2-5g-xpon-stick-sfp-onu/). This install ordered one module with **Hardware Version: Generic** and **Connector Type: SC APC**. The page lists that module as model **LL-XS2510**, chipset Realtek RTL9601D. That is the ODI stick this guide and the DFP-34X-2C2 firmware image call a DFP-34X-2C2. Generic and Enhanced DDM are the same GPON stick; Enhanced DDM adds a DDM chip for optical readings in RouterOS, which this UCG Fiber path does not use. The connector is the green angled SC APC plug. Order SC UPC only if your fiber jumper is blue and flat.
 - UniFi Cloud Gateway Fiber. The SFP+ WAN is physical port 7, interface `eth6`. Confirm with `ip -br link` after the stick is inserted.
 - The BGW's ONT serial, hardware version, software version, and WAN MAC, copied down **before** you pull the fiber.
 - A machine that can SSH to the gateway as `root` while the LAN is up. Enable SSH under Control Plane → Console, or Settings → System → Advanced → Device Authentication. A user key often fails; `root` with the device password works.
@@ -42,6 +42,7 @@ These are the documents this install followed, plus the pages those documents se
 | [PON Madness — AT&T GPON ONT cloning](https://docs.google.com/document/d/1gcT0sJKLmV816LK0lROCoywk9lXbPQ7l_4jhzGIgoTo/edit) | 8311 community notes for getting a stick to O5 on AT&T GPON, including the ODI firmware image. The drifterxe guide follows this for the 320-500. |
 | [pon.wiki: masquerade as a BGW320-500/505](https://pon.wiki/guides/masquerade-as-the-att-inc-bgw320-500-505-with-the-was-110/) | Identity table for a 505 (NOKA serial, equipment id, hardware version). Written for a WAS-110, so the commands differ from `flash set` on a DFP-34X-2C2. The identity strings are what the OLT expects. |
 | [Anime4000/RTL960x](https://github.com/Anime4000/RTL960x) and the [ODI image](https://github.com/rajkosto/RTL960x/blob/main/Firmware/DFP-34X-2C2/M110_sfp_ODI_220923FS.tar) | Stick firmware (`M110_sfp_ODI_220923FS.tar`) and `flash set` field notes. `OMCI_OLT_MODE 21` is what lets a custom software version survive reboot on this stick. |
+| [Luleey LL-XS2510](https://www.luleey.com/product/2-5g-xpon-stick-sfp-onu/) | The stick this install used: 2.5G XPON SFP ONU Stick for FTTH, one module, Hardware Version Generic, Connector Type SC APC. |
 | [Debian wpasupplicant](https://packages.debian.org/bullseye/arm64/wpasupplicant) / [libpcsclite1](https://packages.debian.org/bullseye/arm64/libpcsclite1) | Packages cached on the gateway. Trixie equivalents are linked in the install step. |
 
 Evie's guide also points at the older [USG writeup](https://wells.ee/journal/2020-03-01-bypassing-att-fiber-modem-unifi-usg/), the [Arch Wiki `wpa_supplicant` page](https://wiki.archlinux.org/title/Wpa_supplicant), [this MAC-clone note](https://www.xmodulo.com/spoof-mac-address-network-interface-linux.html), [DigitalOcean's systemd unit guide](https://www.digitalocean.com/community/tutorials/understanding-systemd-units-and-unit-files), and [this UniFi OS 3.2 thread](https://www.reddit.com/r/Ubiquiti/comments/18rc0ag/att_modem_bypass_and_unifios_32x_guide/).
@@ -239,7 +240,7 @@ The dashboard clone is the one that survives a UniFi reprovision. `changemac`, t
 ## 7. Cut over
 
 1. Pull the fiber from the BGW.
-2. Seat the DFP-34X-2C2 in port 7 and connect the fiber.
+2. Seat the LL-XS2510 in port 7 and connect the fiber. The jumper and the stick are both SC APC.
 3. From the laptop checkout, with `local/` filled in:
 
    ```bash
