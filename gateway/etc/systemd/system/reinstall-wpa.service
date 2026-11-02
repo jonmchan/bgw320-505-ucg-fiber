@@ -1,0 +1,18 @@
+[Unit]
+Description=Restore AT&T GPON bypass files and start wpa_supplicant
+AssertPathExists=/etc/wpa_supplicant/reinstall-wpa.sh
+
+# The wired supplicant restarts itself. This unit gets the binary, the VLAN 0
+# interface, and the files an upgrade deleted back into place.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=oneshot
+ExecStart=/etc/wpa_supplicant/reinstall-wpa.sh
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target

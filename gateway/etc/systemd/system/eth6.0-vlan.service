@@ -1,0 +1,13 @@
+[Unit]
+Description=Clone AT&T ONT MAC and create eth6.0 for EAP
+Before=wpa_supplicant-wired@eth6.0.service
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/wpa_supplicant/att-eap-wan-prep.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

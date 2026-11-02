@@ -1,0 +1,8 @@
+[Unit]
+Description=Keep the DFP-34X-2C2 admin route on eth6
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/wpa_supplicant/sfp-admin-route.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Reapply the DFP-34X-2C2 admin route after UniFi rewrites it
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+AccuracySec=10
+
+[Install]
+WantedBy=timers.target

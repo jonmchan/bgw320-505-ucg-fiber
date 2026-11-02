@@ -1,0 +1,16 @@
+#!/bin/sh
+# Spoof the SFP WAN when eth6 comes up. The address is the ONT MAC in
+# /etc/wpa_supplicant/ont-mac. A missing file must not fail ifup.
+if [ "$IFACE" != eth6 ]; then
+  exit 0
+fi
+if [ ! -f /etc/wpa_supplicant/ont-mac ]; then
+  exit 0
+fi
+mac=$(tr 'A-F' 'a-f' < /etc/wpa_supplicant/ont-mac | tr -d '[:space:]')
+case $mac in
+  [0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f])
+    ip link set dev "$IFACE" address "$mac"
+    ;;
+esac
+exit 0

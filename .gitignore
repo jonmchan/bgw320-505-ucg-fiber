@@ -1,0 +1,10 @@
+# Extracted 802.1X material and anything filled in for one circuit.
+# Put those under local/ and keep them off the remote.
+local/
+*.pem
+*.der
+*.key
+*.bin
+*.tar.gz
+*.deb
+.DS_Store

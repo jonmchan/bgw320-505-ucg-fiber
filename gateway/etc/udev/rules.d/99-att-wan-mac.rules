@@ -1,0 +1,1 @@
+ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="eth6", RUN+="/etc/wpa_supplicant/att-eap-wan-prep.sh"
