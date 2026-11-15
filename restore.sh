@@ -25,7 +25,9 @@ fi
 echo "restoring $ROOT onto $TARGET"
 ssh -o BatchMode=yes -o ConnectTimeout=8 "$TARGET" true
 
-# macOS tags these files with provenance xattrs, which the gateway tar warns about.
+# macOS tar stores com.apple.provenance as a pax header on every member.
+# xattr -cr does not stop that. --no-xattrs keeps it out of the archive, and
+# the gateway tar ignores any unknown pax keyword that still gets through.
 if command -v xattr >/dev/null 2>&1; then
   if [ -d "$LOCAL" ]; then
     xattr -cr "$ROOT/gateway" "$LOCAL" 2>/dev/null || true
@@ -38,12 +40,12 @@ fi
 COPYFILE_DISABLE=1
 export COPYFILE_DISABLE
 
-tar -C "$ROOT/gateway" -cf - . \
-  | ssh "$TARGET" 'tar --no-same-owner -C / -xf -'
+tar --no-xattrs -C "$ROOT/gateway" -cf - . \
+  | ssh "$TARGET" 'tar --warning=no-unknown-keyword --no-same-owner -C / -xf -'
 
 if [ -d "$LOCAL/certs" ] && ls "$LOCAL/certs/"*.pem >/dev/null 2>&1; then
-  tar -C "$LOCAL/certs" -cf - . \
-    | ssh "$TARGET" 'mkdir -p /etc/wpa_supplicant/certs && tar --no-same-owner -C /etc/wpa_supplicant/certs -xf - && chmod 600 /etc/wpa_supplicant/certs/*.pem'
+  tar --no-xattrs -C "$LOCAL/certs" -cf - . \
+    | ssh "$TARGET" 'mkdir -p /etc/wpa_supplicant/certs && tar --warning=no-unknown-keyword --no-same-owner -C /etc/wpa_supplicant/certs -xf - && chmod 600 /etc/wpa_supplicant/certs/*.pem'
 else
   echo "no pems in $LOCAL/certs; leaving certificates already on the gateway" >&2
 fi
@@ -57,8 +59,8 @@ if [ -f "$LOCAL/wpa_supplicant-wired-eth6.0.conf" ]; then
 fi
 
 if [ -d "$LOCAL/packages" ] && ls "$LOCAL/packages/"*.deb >/dev/null 2>&1; then
-  tar -C "$LOCAL/packages" -cf - . \
-    | ssh "$TARGET" 'mkdir -p /etc/wpa_supplicant/packages && tar --no-same-owner -C /etc/wpa_supplicant/packages -xf -'
+  tar --no-xattrs -C "$LOCAL/packages" -cf - . \
+    | ssh "$TARGET" 'mkdir -p /etc/wpa_supplicant/packages && tar --warning=no-unknown-keyword --no-same-owner -C /etc/wpa_supplicant/packages -xf -'
 else
   echo "no debs in $LOCAL/packages; using the cache already on the gateway" >&2
 fi
@@ -125,8 +127,11 @@ systemctl daemon-reload
 systemctl enable eth6.0-vlan.service
 systemctl enable reinstall-wpa.service
 systemctl enable sfp-admin-route.timer
-systemctl enable wpa_supplicant-wired@eth6.0
 systemctl start sfp-admin-route.timer
+# wpa_supplicant-wired@.service ships in the wpasupplicant deb. Enabling the
+# eth6.0 instance before that package is installed fails and, with set -e,
+# skips the install. reinstall-wpa.sh installs the deb for this Debian
+# release, then enables and starts the instance.
 /etc/wpa_supplicant/reinstall-wpa.sh
 EOF
 

@@ -23,12 +23,39 @@ chmod_if() {
   fi
 }
 
-if [ ! -x /sbin/wpa_supplicant ]; then
-  if ! ls /etc/wpa_supplicant/packages/wpasupplicant_*arm64.deb >/dev/null 2>&1; then
-    echo "wpa_supplicant is missing and /etc/wpa_supplicant/packages has no arm64 deb" >&2
+# A removed or foreign binary can still be executable and then fail to load.
+# wpa_supplicant -v exits 0 only when the installed binary actually runs.
+if ! /sbin/wpa_supplicant -v >/dev/null 2>&1; then
+  if [ ! -r /etc/os-release ]; then
+    echo "wpa_supplicant is missing and /etc/os-release is unreadable" >&2
     exit 1
   fi
-  dpkg -Ri /etc/wpa_supplicant/packages
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  dir=/etc/wpa_supplicant/packages
+  case "${VERSION_CODENAME:-}" in
+    bullseye)
+      # Debian 11 / OpenSSL 1.1. These need libssl1.1 and do not configure on trixie.
+      set -- "$dir"/libpcsclite1_1.*.deb "$dir"/wpasupplicant_2.9*.deb
+      ;;
+    trixie)
+      # Debian 13 / OpenSSL 3. libssl3t64 and libreadline8t64 are already on the image.
+      set -- "$dir"/libpcsclite1_2.*.deb "$dir"/wpasupplicant_2.10*.deb
+      ;;
+    *)
+      echo "wpa_supplicant is missing and Debian ${VERSION_CODENAME:-unknown} has no cached debs" >&2
+      exit 1
+      ;;
+  esac
+  for deb in "$@"; do
+    if [ ! -f "$deb" ]; then
+      echo "missing cached package for ${VERSION_CODENAME}: $deb" >&2
+      exit 1
+    fi
+  done
+  # Do not dpkg -Ri the whole directory. That installs every cached release,
+  # and the bullseye wpasupplicant cannot be configured on Debian 13.
+  DEBIAN_FRONTEND=noninteractive dpkg --force-confdef --force-confold -i "$@"
 fi
 
 # OpenSSL 3 rejects the SHA1 AT&T CA unless the security level is lowered.
@@ -83,7 +110,7 @@ systemctl daemon-reload
 systemctl reset-failed eth6.0-vlan.service wpa_supplicant-wired@eth6.0.service >/dev/null 2>&1 || true
 systemctl enable eth6.0-vlan.service >/dev/null 2>&1 || true
 systemctl start eth6.0-vlan.service
-systemctl enable wpa_supplicant-wired@eth6.0 >/dev/null 2>&1 || true
+systemctl enable wpa_supplicant-wired@eth6.0
 systemctl start wpa_supplicant-wired@eth6.0
 
 if [ -f /etc/systemd/system/sfp-admin-route.timer ]; then

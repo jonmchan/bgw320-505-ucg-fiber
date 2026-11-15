@@ -13,7 +13,7 @@ Two VLANs are in play, and they are different jobs:
 - **EAP** is priority-tagged VLAN 0. Create `eth6.0` and run `wpa_supplicant` there.
 - **Customer traffic** uses the VID the OLT programmed onto the stick. Read it with `omcicli mib get 84` and set that VID on the UniFi WAN. A published BGW320-500 example used VID 722. Yours will differ. Read the stick.
 
-Checked on UniFi OS 5.1.33 and, after an upgrade, 5.1.34. Both were Debian 11, OpenSSL 1.1.1, aarch64, with `wpasupplicant` 2.9. A later UniFi OS that moves the gateway to Debian 13 / OpenSSL 3 needs the matching packages and one extra config line, below.
+Checked on UniFi OS 5.1.33 and 5.1.34 (Debian 11, OpenSSL 1.1.1, aarch64, `wpasupplicant` 2.9), and on UniFi OS 6.0.17 (Debian 13.7, OpenSSL 3.5.7, aarch64, `wpasupplicant` 2.10). The 6.0.17 upgrade removes the Debian 11 package. Cache the Debian 13 pair before that, and let `reinstall-wpa.sh` add the OpenSSL 3 line below.
 
 Doing this can take the circuit offline, and it can conflict with AT&T's terms. The certificates authenticate as your ONT. They are not in this repository.
 
@@ -43,7 +43,7 @@ These are the documents this install followed, plus the pages those documents se
 | [pon.wiki: masquerade as a BGW320-500/505](https://pon.wiki/guides/masquerade-as-the-att-inc-bgw320-500-505-with-the-was-110/) | Identity table for a 505 (NOKA serial, equipment id, hardware version). Written for a WAS-110, so the commands differ from `flash set` on a DFP-34X-2C2. The identity strings are what the OLT expects. |
 | [Anime4000/RTL960x](https://github.com/Anime4000/RTL960x) and the [ODI image](https://github.com/rajkosto/RTL960x/blob/main/Firmware/DFP-34X-2C2/M110_sfp_ODI_220923FS.tar) | Stick firmware (`M110_sfp_ODI_220923FS.tar`) and `flash set` field notes. `OMCI_OLT_MODE 21` is what lets a custom software version survive reboot on this stick. |
 | [Luleey LL-XS2510](https://www.luleey.com/product/2-5g-xpon-stick-sfp-onu/) | The stick this install used: 2.5G XPON SFP ONU Stick for FTTH, one module, Hardware Version Generic, Connector Type SC APC. |
-| [Debian wpasupplicant](https://packages.debian.org/bullseye/arm64/wpasupplicant) / [libpcsclite1](https://packages.debian.org/bullseye/arm64/libpcsclite1) | Packages cached on the gateway. Trixie equivalents are linked in the install step. |
+| [Debian wpasupplicant](https://packages.debian.org/bullseye/arm64/wpasupplicant) / [libpcsclite1](https://packages.debian.org/bullseye/arm64/libpcsclite1) | Bullseye packages for 5.1.33 and 5.1.34. Trixie packages for 6.0.17 are in the install step. |
 
 Evie's guide also points at the older [USG writeup](https://wells.ee/journal/2020-03-01-bypassing-att-fiber-modem-unifi-usg/), the [Arch Wiki `wpa_supplicant` page](https://wiki.archlinux.org/title/Wpa_supplicant), [this MAC-clone note](https://www.xmodulo.com/spoof-mac-address-network-interface-linux.html), [DigitalOcean's systemd unit guide](https://www.digitalocean.com/community/tutorials/understanding-systemd-units-and-unit-files), and [this UniFi OS 3.2 thread](https://www.reddit.com/r/Ubiquiti/comments/18rc0ag/att_modem_bypass_and_unifios_32x_guide/).
 
@@ -192,7 +192,7 @@ openssl version
 uname -m
 ```
 
-Cache **one** Debian release under `/etc/wpa_supplicant/packages`. `dpkg -Ri` installs every `.deb` in that directory. A bullseye `wpasupplicant` cannot run on trixie.
+Cache the pair that matches the gateway you are installing on. `local/packages/` may hold both releases; `reinstall-wpa.sh` installs only the pair for `VERSION_CODENAME`. Do not `dpkg -Ri` or `dpkg -i ./*.deb` when both releases are in the same directory. The bullseye `wpasupplicant` depends on `libssl1.1` and cannot be configured on trixie, and that failed install does not leave `wpa_supplicant-wired@.service` on disk.
 
 Debian 11 (bullseye), OpenSSL 1.1 — this is what 5.1.33 and 5.1.34 were:
 
@@ -201,7 +201,7 @@ mkdir -p /etc/wpa_supplicant/packages
 cd /etc/wpa_supplicant/packages
 wget http://security.debian.org/debian-security/pool/updates/main/w/wpa/wpasupplicant_2.9.0-21+deb11u3_arm64.deb
 wget http://ftp.us.debian.org/debian/pool/main/p/pcsc-lite/libpcsclite1_1.9.1-1_arm64.deb
-dpkg -i ./*.deb
+dpkg -i libpcsclite1_1.9.1-1_arm64.deb wpasupplicant_2.9.0-21+deb11u3_arm64.deb
 ```
 
 Debian 13 (trixie), OpenSSL 3:
@@ -211,7 +211,7 @@ mkdir -p /etc/wpa_supplicant/packages
 cd /etc/wpa_supplicant/packages
 wget http://ftp.us.debian.org/debian/pool/main/w/wpa/wpasupplicant_2.10-24_arm64.deb
 wget http://ftp.us.debian.org/debian/pool/main/p/pcsc-lite/libpcsclite1_2.3.3-1_arm64.deb
-dpkg -i ./*.deb
+dpkg -i libpcsclite1_2.3.3-1_arm64.deb wpasupplicant_2.10-24_arm64.deb
 ```
 
 Package indexes move. The download pages are [bullseye wpasupplicant](https://packages.debian.org/bullseye/arm64/wpasupplicant/download), [bullseye libpcsclite1](https://packages.debian.org/bullseye/arm64/libpcsclite1/download), [trixie wpasupplicant](https://packages.debian.org/trixie/arm64/wpasupplicant/download), and [trixie libpcsclite1](https://packages.debian.org/trixie/arm64/libpcsclite1/download).
@@ -222,7 +222,7 @@ Confirm the binary has the wired driver:
 wpa_supplicant -h 2>&1 | head -n 40
 ```
 
-Copy those same `.deb` files into `local/packages/` on the laptop. `restore.sh` uploads them. After an upgrade the gateway cannot `apt-get` them, because the WAN is what those packages authenticate.
+Copy those `.deb` files into `local/packages/` on the laptop. Keep the other release's pair there too if you already have it. `restore.sh` uploads the directory. After an upgrade the gateway cannot `apt-get` them, because the WAN is what those packages authenticate. On 6.0.17 the rest of the dependency list was already installed: `libssl3t64`, `libreadline8t64`, `libdbus-1-3`, `libnl-3-200`, `libnl-genl-3-200`, `libnl-route-3-200`, and `adduser`. The `+ubnt` libnl build satisfied the Debian version bounds. `pcscd` was not installed.
 
 `dpkg` enables the stock `wpa_supplicant.service` (the Wi-Fi / dbus instance). EAP uses `wpa_supplicant-wired@eth6.0` instead. `reinstall-wpa.sh` disables the stock unit so the two do not fight.
 
@@ -247,7 +247,7 @@ The dashboard clone is the one that survives a UniFi reprovision. `changemac`, t
    ./restore.sh root@<gateway-lan-address>
    ```
 
-   `restore.sh` copies `gateway/` onto the gateway root, uploads `local/certs`, `local/ont-mac`, `local/wpa_supplicant-wired-eth6.0.conf`, and `local/packages` when those exist, refreshes `/etc/wpa_supplicant/persist/`, and runs `reinstall-wpa.sh`.
+   `restore.sh` copies `gateway/` onto the gateway root, uploads `local/certs`, `local/ont-mac`, `local/wpa_supplicant-wired-eth6.0.conf`, and `local/packages` when those exist, refreshes `/etc/wpa_supplicant/persist/`, and runs `reinstall-wpa.sh`. It does not enable `wpa_supplicant-wired@eth6.0` itself. That unit file is inside the `wpasupplicant` package, and enabling the instance before the package is configured aborts the script.
 
 To do the same steps by hand:
 
@@ -296,12 +296,12 @@ Evie's `reinstall-wpa.service` only installs the cached debs when `/sbin/wpa_sup
 
 `/etc/wpa_supplicant/reinstall-wpa.sh` runs at every boot from `reinstall-wpa.service`:
 
-1. If `/sbin/wpa_supplicant` is gone, `dpkg -Ri /etc/wpa_supplicant/packages`.
+1. If `wpa_supplicant -v` fails, install the cached pair for `VERSION_CODENAME` in `/etc/os-release`. Bullseye gets `wpasupplicant` 2.9 and `libpcsclite1` 1.9. Trixie gets `wpasupplicant` 2.10 and `libpcsclite1` 2.3. `-x` is the wrong test: a leftover bullseye binary can be executable and still fail to load `libssl1.1`.
 2. On OpenSSL 3, insert the global `openssl_ciphers` line when the wired config does not have it.
 3. Copy anything missing back from `/etc/wpa_supplicant/persist/`.
 4. Copy the prep and stick-admin scripts out to `/usr/local/sbin` when that directory was wiped.
 5. Disable the stock `wpa_supplicant.service`.
-6. Start `eth6.0-vlan.service`, then `wpa_supplicant-wired@eth6.0`.
+6. Start `eth6.0-vlan.service`, then enable and start `wpa_supplicant-wired@eth6.0`.
 
 The service unit points at `/etc/wpa_supplicant/att-eap-wan-prep.sh` on purpose. That directory is the one 5.1.34 left in place. A later upgrade that only deletes `/usr/local` can create `eth6.0` and start EAP without a laptop.
 
@@ -313,7 +313,34 @@ If an upgrade removes `/etc/wpa_supplicant` as well, the boot script is gone wit
 
 The internet is not required for that. The script uses the checkout and SSH. Certificates can come from `local/certs` or from files still on the gateway.
 
-Keep the cached debs in one Debian release. After an upgrade, re-check `openssl version`. If it moved from OpenSSL 1.1 to OpenSSL 3, delete the bullseye debs from `/etc/wpa_supplicant/packages`, download the trixie pair, and run `reinstall-wpa.sh` again.
+Both Debian releases can sit in `/etc/wpa_supplicant/packages`. The boot script installs one pair. A manual `dpkg -i ./*.deb` in that directory still installs every file it finds.
+
+### UniFi OS 6.0.17 (2026-11-15)
+
+`ubnt-device-info firmware` reported `6.0.17UCGF.ipq9574.v6.0.17.7bcad58.261103.1126`. `unifi-native` was `10.6.109-36013-1`. The image is Debian 13.7 (trixie), OpenSSL 3.5.7 (9 Jun 2026), aarch64. `/sbin` points at `usr/sbin`.
+
+The upgrade removed the Debian 11 `wpasupplicant`, and the unit file with it. The LAN stayed up. The customer VLAN had no lease.
+
+The boot script on the gateway was still the old one, so it ran `dpkg -Ri /etc/wpa_supplicant/packages` against the cached bullseye debs:
+
+- `libpcsclite1` 1.9.1 installed. The trixie image had not included that library.
+- `wpasupplicant` 2.9.0-21+deb11u3 unpacked, then stayed unconfigured because it depends on `libssl1.1`. Trixie has `libssl3t64` instead. The package ended `rc` (removed, config files left). `wpa_supplicant-wired@.service` was not on disk.
+
+`restore.sh` stopped on this line, before it installed anything:
+
+```text
+Failed to enable unit: Unit wpa_supplicant-wired@eth6.0.service does not exist
+```
+
+The enable is under `set -e`, so `reinstall-wpa.sh` never ran. Running the script again printed the same line.
+
+The repeated `tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'` lines are one warning per archived file. macOS tar writes that pax header even after `xattr -cr`. GNU tar 1.35 warns and still extracts. `restore.sh` now creates the archive with `--no-xattrs` and extracts with `--warning=no-unknown-keyword`.
+
+The trixie pair was enough. Already present: `libssl3t64` 3.5.7-1~deb13u3, `libreadline8t64`, `libdbus-1-3`, `libnl-3-200`, `libnl-genl-3-200`, `libnl-route-3-200` (`3.7.0-2+ubnt`), and `adduser`. `pcscd` was not installed, so `libpcsclite1` 2.3.3's break on an older `pcscd` did not apply.
+
+`dpkg --force-confdef --force-confold -i` of `libpcsclite1_2.3.3-1_arm64.deb` and `wpasupplicant_2.10-24_arm64.deb` upgraded `libpcsclite1` off 1.9.1 and configured `wpasupplicant` 2:2.10-24. The unit is `/usr/lib/systemd/system/wpa_supplicant-wired@.service`, with `ExecStart=/usr/sbin/wpa_supplicant`. Leftover bullseye conffiles `action_wpa.sh`, `functions.sh`, and `ifupdown.sh` were kept. The obsolete `/etc/dbus-1/system.d/wpa_supplicant.conf` was saved as `.dpkg-old`. The package postinst enabled the stock dbus unit, and `reinstall-wpa.sh` disabled it again.
+
+The script inserted `openssl_ciphers=DEFAULT@SECLEVEL=0` above `network={`. EAP then reached `wpa_state=COMPLETED`, `EAP state=SUCCESS`, and `suppPortStatus=Authorized`, and DHCPv4 came up on the customer VLAN.
 
 ## Layout
 
@@ -356,6 +383,9 @@ On the gateway, after `restore.sh`:
 | `fopen: No such file or directory` on a cert | Paths in the supplicant config are still relative. |
 | `ca md too weak`, then a passphrase prompt | OpenSSL 3. Add the global `openssl_ciphers=DEFAULT@SECLEVEL=0` line. The key has no passphrase. |
 | `eth6.0-vlan.service` status 203 after an upgrade | The prep script was deleted. Run `/etc/wpa_supplicant/reinstall-wpa.sh`, or `restore.sh` from the LAN. |
+| `Failed to enable unit: Unit wpa_supplicant-wired@eth6.0.service does not exist` | The template unit is part of `wpasupplicant`. On 6.0.17 the Debian 11 package was removed and the bullseye `.deb` cannot be configured. Install the trixie pair, then enable the instance. `restore.sh` does that in that order. |
+| `tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'` | macOS provenance metadata. Extraction still succeeds. Current `restore.sh` omits those headers. |
+| `wpasupplicant depends on libssl1.1` | A bullseye `.deb` was installed on Debian 13. Install `wpasupplicant` 2.10 and `libpcsclite1` 2.3.3 instead. |
 | Stock `wpa_supplicant.service` is active next to the wired one | `dpkg` enabled it. `reinstall-wpa.sh` disables it. |
 | `eth6.<vid>` never gets a lease, EAP is `Authorized` | The UniFi WAN VLAN is not the VID from `omcicli mib get 84`, or the MAC clone is not the `identity=` MAC. |
 | Stick admin page does not load | `sfp-admin-route.timer` is not running, or the LAN is `192.168.1.0/24`. |
